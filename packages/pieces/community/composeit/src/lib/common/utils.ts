@@ -1,6 +1,15 @@
-type SchemaType = 'number' | 'boolean' | 'date' | 'json' | 'string' | 'relation';
+import { type ArraySubProps, Property } from '@activepieces/pieces-framework';
+
+type SchemaType =
+  | 'number'
+  | 'boolean'
+  | 'date'
+  | 'json'
+  | 'string'
+  | 'relation';
 
 interface SchemaProperty {
+  id: string;
   type: SchemaType;
   target?: string;
   isMany?: boolean;
@@ -12,118 +21,122 @@ export interface DataSource {
   isRoot?: boolean;
 }
 
-interface JsonSchemaType {
-  type: string;
-  format?: string;
-  additionalProperties?: boolean;
-}
+const MAX_DEPTH = 1;
 
-interface JsonSchemaObject {
-  type: 'object';
-  properties: Record<string, JsonSchemaType | JsonSchemaArray | JsonSchemaObject>;
-}
+const isObject = (test: unknown): test is Record<string, unknown> =>
+  typeof test === 'object' && test !== null;
 
-interface JsonSchemaArray {
-  type: 'array';
-  items: JsonSchemaObject;
-}
+const isEmpty = (test: unknown): boolean => {
+  if (test === undefined || test === null) return true;
+  if (isObject(test)) return Object.keys(test).length === 0;
+  if (Array.isArray(test)) return test.length === 0;
+  return false;
+};
 
-const MAX_DEPTH = 4;
-
-function mapSchemaTypeToJsonSchemaType(schemaType?: SchemaType): JsonSchemaType {
-  if (!schemaType) return { type: 'string' };
-
+function createPrimitiveApProperty(
+  schemaType: SchemaType,
+  displayName: string
+): unknown {
   switch (schemaType) {
     case 'number':
-      return { type: 'number' };
+      return Property.Number({ displayName, required: false });
     case 'boolean':
-      return { type: 'boolean' };
+      return Property.Checkbox({ displayName, required: false });
     case 'date':
-      return { type: 'string', format: 'date-time' };
+      return Property.DateTime({ displayName, required: false });
     case 'json':
-      return { type: 'object', additionalProperties: true };
+      return Property.Json({ displayName, required: false, defaultValue: {} });
     case 'string':
     case 'relation':
     default:
-      return { type: 'string' };
+      return Property.ShortText({ displayName, required: false });
   }
 }
 
-function isEmpty(test: unknown): boolean {
-  if (test === undefined || test === null) return true;
-  if (typeof test === 'object' && !Array.isArray(test))
-    return Object.keys(test as object).length === 0;
-  if (Array.isArray(test)) return test.length === 0;
-  return false;
-}
-
-function parseCollectionToFields(
+function parseCollectionToApProperties(
   currentSource: DataSource,
   allSources: DataSource[],
+  prefix = '',
   visited = new Set<string>(),
-  depth = 0,
-): JsonSchemaObject | null {
-  if (!currentSource || !currentSource.schema || isEmpty(currentSource.schema)) {
-    return null;
+  depth = 0
+) {
+  if (
+    !currentSource ||
+    !currentSource.schema ||
+    isEmpty(currentSource.schema)
+  ) {
+    return {};
   }
 
-  if (visited.has(currentSource.id)) return null;
+  if (visited.has(currentSource.id)) return {};
   visited.add(currentSource.id);
 
-  const properties: Record<
-    string,
-    JsonSchemaType | JsonSchemaArray | JsonSchemaObject
-  > = {};
+  const properties: Record<string, unknown> = {};
 
   for (const [key, property] of Object.entries(currentSource.schema)) {
     if (key === 'id') continue;
 
+    const fieldKey = prefix ? `${prefix}_${property.id}` : property.id;
+    const fieldLabel = key;
+
     if (property.type === 'relation') {
-      if (depth >= MAX_DEPTH) continue;
+      if (depth >= MAX_DEPTH) {
+        properties[fieldKey] = Property.Json({
+          displayName: `${fieldLabel} (Nested Data)`,
+          description: `Enter JSON object for field: ${fieldLabel} (Max depth reached)`,
+          required: false,
+          defaultValue: {},
+        });
+        continue;
+      }
 
       const targetSource = allSources.find((src) => src.id === property.target);
 
       if (targetSource) {
-        const childSchema = parseCollectionToFields(
+        const childProperties = parseCollectionToApProperties(
           targetSource,
           allSources,
+          fieldKey,
           new Set(visited),
-          depth + 1,
+          depth + 1
         );
 
-        if (childSchema && Object.keys(childSchema.properties).length > 0) {
+        if (Object.keys(childProperties).length > 0) {
           if (property.isMany) {
-            properties[key] = { type: 'array', items: childSchema };
+            properties[fieldKey] = Property.Array({
+              displayName: fieldLabel,
+              description: `Add items for ${fieldLabel}`,
+              required: false,
+              properties: childProperties as ArraySubProps<true>,
+            });
           } else {
-            properties[key] = childSchema;
+            properties[fieldKey] = Property.Json({
+              displayName: fieldLabel,
+              description: `Configuration parameters for ${fieldLabel}`,
+              required: false,
+            });
           }
         }
       }
     } else {
-      properties[key] = mapSchemaTypeToJsonSchemaType(property.type);
+      properties[fieldKey] = createPrimitiveApProperty(
+        property.type,
+        fieldLabel
+      );
     }
   }
 
-  return { type: 'object', properties };
+  return properties;
 }
 
-export function parseDatasourcesToJsonSchema(dataSources: DataSource[]): object {
+export const parseDatasourcesToActivepieces = (
+  dataSources: DataSource[]
+): Record<string, unknown> => {
   if (!Array.isArray(dataSources) || dataSources.length === 0) {
-    return {
-      $schema: 'http://json-schema.org/draft-07/schema#',
-      type: 'object',
-      properties: {},
-    };
+    return {};
   }
 
   const rootSource =
-    dataSources.find((source) => source.isRoot === true) ?? dataSources[0];
-
-  const rootSchema = parseCollectionToFields(rootSource, dataSources);
-
-  return {
-    $schema: 'http://json-schema.org/draft-07/schema#',
-    type: 'object',
-    properties: rootSchema ? rootSchema.properties : {},
-  };
-}
+    dataSources.find((source) => source.isRoot === true) || dataSources[0];
+  return parseCollectionToApProperties(rootSource, dataSources);
+};

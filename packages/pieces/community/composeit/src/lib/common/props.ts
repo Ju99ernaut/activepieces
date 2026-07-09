@@ -37,7 +37,6 @@ function templateDropdown({
         };
       }
       try {
-        console.log(auth)
         const response = await httpClient.sendRequest<TemplatesResponse>({
           method: HttpMethod.GET,
           url: `${COMPOSEIT_API_URL}/templates`,
@@ -59,8 +58,7 @@ function templateDropdown({
             value: t.id,
           })),
         };
-      } catch (error) {
-        console.log(error)
+      } catch {
         return {
           disabled: false,
           placeholder: 'Error loading templates',

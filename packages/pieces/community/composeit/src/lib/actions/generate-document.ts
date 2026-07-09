@@ -1,8 +1,13 @@
-import { Property, createAction } from '@activepieces/pieces-framework';
+import {
+  type InputPropertyMap,
+  Property,
+  createAction,
+} from '@activepieces/pieces-framework';
 import { HttpMethod, httpClient } from '@activepieces/pieces-common';
 import { composeitAuth } from '../auth';
 import { composeitProps } from '../common/props';
 import { COMPOSEIT_API_URL } from '../common/constants';
+import { parseDatasourcesToActivepieces } from '../common/utils';
 
 interface ExportResult {
   html?: {
@@ -83,15 +88,42 @@ export const generateDocumentAction = createAction({
         'Generate with a watermark (test mode). Does not count against your quota.',
       required: false,
     }),
-    data: Property.Json({
-      displayName: 'Data',
-      description:
-        'JSON data to merge with the template. Keys must match template variables.',
+    fields: Property.DynamicProperties({
+      displayName: 'Fields',
+      description: 'Map fields to merge with the template variables.',
       required: false,
+      auth: composeitAuth,
+      refreshers: ['auth', 'templateId'],
+      props: async ({ auth, templateId, ...rest }) => {
+        if (!templateId || !auth) return {};
+
+        const response = await httpClient.sendRequest({
+          method: HttpMethod.GET,
+          url: `${COMPOSEIT_API_URL}/templates/${templateId}`,
+          headers: {
+            'X-API-KEY': auth.secret_text,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+        });
+
+        const template = response.body;
+        if (
+          !template ||
+          !template.definition ||
+          !template.definition.dataSources
+        ) {
+          return {};
+        }
+
+        return parseDatasourcesToActivepieces(
+          template.definition.dataSources
+        ) as InputPropertyMap;
+      },
     }),
   },
   async run(context) {
-    const { templateId, templateVersion, formats, imageType, isTest, data } =
+    const { templateId, templateVersion, formats, imageType, isTest, fields } =
       context.propsValue;
 
     const body: Record<string, unknown> = {
@@ -102,7 +134,7 @@ export const generateDocumentAction = createAction({
     if (templateVersion) body['templateVersion'] = templateVersion;
     if (imageType) body['imageType'] = imageType;
     if (isTest !== undefined && isTest !== null) body['isTest'] = isTest;
-    if (data) body['data'] = data;
+    if (fields) body['data'] = fields;
 
     const response = await httpClient.sendRequest<ExportResult>({
       method: HttpMethod.POST,

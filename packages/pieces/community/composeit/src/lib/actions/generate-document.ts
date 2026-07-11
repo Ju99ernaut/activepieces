@@ -1,5 +1,6 @@
 import {
   type InputPropertyMap,
+  MarkdownVariant,
   Property,
   createAction,
 } from '@activepieces/pieces-framework';
@@ -47,6 +48,10 @@ export const generateDocumentAction = createAction({
   description:
     'Merge a Composeit template with data and generate the specified output formats (PDF, HTML, Image, MJML).',
   props: {
+    templateGroup: Property.MarkDown({
+      value: '### Template',
+      variant: MarkdownVariant.BORDERLESS,
+    }),
     templateId: composeitProps.templateDropdown({
       displayName: 'Template',
       description: 'The template to merge with data.',
@@ -56,6 +61,10 @@ export const generateDocumentAction = createAction({
       description:
         'Specific version of the template to use. Leave blank to use the latest.',
       required: false,
+    }),
+    payloadGroup: Property.MarkDown({
+      value: '### Payload',
+      variant: MarkdownVariant.BORDERLESS,
     }),
     formats: Property.StaticMultiSelectDropdown({
       displayName: 'Formats',
@@ -88,14 +97,42 @@ export const generateDocumentAction = createAction({
         'Generate with a watermark (test mode). Does not count against your quota.',
       required: false,
     }),
+    fieldsGroup: Property.MarkDown({
+      value: '### Fields',
+      variant: MarkdownVariant.BORDERLESS,
+    }),
+    inputMode: Property.StaticDropdown({
+      displayName: 'Data Input Mode',
+      description: 'Choose how you want to input variables into your template',
+      required: true,
+      defaultValue: 'form',
+      options: {
+        options: [
+          { label: 'Form Builder (Simple)', value: 'form' },
+          { label: 'Raw JSON (Advanced)', value: 'json' },
+        ],
+      },
+    }),
     fields: Property.DynamicProperties({
       displayName: 'Fields',
       description: 'Map fields to merge with the template variables.',
       required: false,
       auth: composeitAuth,
-      refreshers: ['auth', 'templateId'],
-      props: async ({ auth, templateId }) => {
+      refreshers: ['auth', 'templateId', 'inputMode'],
+      props: async ({ auth, templateId, inputMode }) => {
         if (!templateId || !auth) return {};
+
+        if (inputMode === 'json') {
+          return {
+            jsonData: Property.Json({
+              displayName: 'JSON Data',
+              description:
+                'Provide a structured nested object or map variables directly as JSON.',
+              required: false,
+              defaultValue: {},
+            }),
+          };
+        }
 
         const response = await httpClient.sendRequest({
           method: HttpMethod.GET,

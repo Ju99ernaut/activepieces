@@ -94,7 +94,7 @@ export const generateDocumentAction = createAction({
       required: false,
       auth: composeitAuth,
       refreshers: ['auth', 'templateId'],
-      props: async ({ auth, templateId, ...rest }) => {
+      props: async ({ auth, templateId }) => {
         if (!templateId || !auth) return {};
 
         const response = await httpClient.sendRequest({

@@ -57,6 +57,7 @@ function parseCollectionToApProperties(
   currentSource: DataSource,
   allSources: DataSource[],
   prefix = '',
+  prefixLabel = '',
   visited = new Set<string>(),
   depth = 0
 ) {
@@ -77,7 +78,7 @@ function parseCollectionToApProperties(
     if (key === 'id') continue;
 
     const fieldKey = prefix ? `${prefix}_${property.id}` : property.id;
-    const fieldLabel = key;
+    const fieldLabel = prefixLabel ? `${prefixLabel}.${key}` : key;
 
     if (property.type === 'relation') {
       if (depth >= MAX_DEPTH) {
@@ -97,6 +98,7 @@ function parseCollectionToApProperties(
           targetSource,
           allSources,
           fieldKey,
+          fieldLabel,
           new Set(visited),
           depth + 1
         );
@@ -110,11 +112,7 @@ function parseCollectionToApProperties(
               properties: childProperties as ArraySubProps<true>,
             });
           } else {
-            properties[fieldKey] = Property.Json({
-              displayName: fieldLabel,
-              description: `Configuration parameters for ${fieldLabel}`,
-              required: false,
-            });
+            Object.assign(properties, childProperties);
           }
         }
       }

@@ -48,10 +48,6 @@ export const generateDocumentAction = createAction({
   description:
     'Merge a Composeit template with data and generate the specified output formats (PDF, HTML, Image, MJML).',
   props: {
-    templateGroup: Property.MarkDown({
-      value: '### Template',
-      variant: MarkdownVariant.BORDERLESS,
-    }),
     templateId: composeitProps.templateDropdown({
       displayName: 'Template',
       description: 'The template to merge with data.',
@@ -104,7 +100,7 @@ export const generateDocumentAction = createAction({
     inputMode: Property.StaticDropdown({
       displayName: 'Data Input Mode',
       description: 'Choose how you want to input variables into your template',
-      required: true,
+      required: false,
       defaultValue: 'form',
       options: {
         options: [
@@ -160,8 +156,15 @@ export const generateDocumentAction = createAction({
     }),
   },
   async run(context) {
-    const { templateId, templateVersion, formats, imageType, isTest, fields } =
-      context.propsValue;
+    const {
+      templateId,
+      templateVersion,
+      formats,
+      imageType,
+      isTest,
+      fields,
+      inputMode,
+    } = context.propsValue;
 
     const body: Record<string, unknown> = {
       templateId,
@@ -171,7 +174,11 @@ export const generateDocumentAction = createAction({
     if (templateVersion) body['templateVersion'] = templateVersion;
     if (imageType) body['imageType'] = imageType;
     if (isTest !== undefined && isTest !== null) body['isTest'] = isTest;
-    if (fields) body['data'] = fields;
+    if (fields)
+      body['data'] = {
+        integration: 'activepieces',
+        inputData: { inputMode, ...fields },
+      };
 
     const response = await httpClient.sendRequest<ExportResult>({
       method: HttpMethod.POST,

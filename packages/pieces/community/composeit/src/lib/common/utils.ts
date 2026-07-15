@@ -98,7 +98,7 @@ function parseCollectionToApProperties(
           targetSource,
           allSources,
           fieldKey,
-          fieldLabel,
+          property.isMany ? '' : fieldLabel,
           new Set(visited),
           depth + 1
         );

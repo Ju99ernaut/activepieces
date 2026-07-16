@@ -10,7 +10,7 @@ export const composeit = createPiece({
   auth: composeitAuth,
   minimumSupportedRelease: '0.36.1',
   logoUrl: 'https://cdn.activepieces.com/pieces/composeit.png',
-  categories: [PieceCategory.PRODUCTIVITY],
+  categories: [PieceCategory.PRODUCTIVITY, PieceCategory.CONTENT_AND_FILES],
   authors: [],
   actions: [generateDocumentAction, updateTemplateAction],
   triggers: [],

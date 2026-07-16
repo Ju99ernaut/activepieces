@@ -45,10 +45,6 @@ function templateDropdown({
             'Content-Type': 'application/json',
             Accept: 'application/json',
           },
-          queryParams: {
-            page: '1',
-            pageSize: '100',
-          },
         });
         const templates = response.body.data ?? [];
         return {

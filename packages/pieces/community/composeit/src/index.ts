@@ -9,7 +9,7 @@ export const composeit = createPiece({
     'Merge templates with data to generate PDF, HTML, Image, and MJML documents using Composeit.',
   auth: composeitAuth,
   minimumSupportedRelease: '0.36.1',
-  logoUrl: 'https://cdn.activepieces.com/pieces/composeit.png',
+  logoUrl: 'https://assets.composeit.website/landing-public/logo.png',
   categories: [PieceCategory.PRODUCTIVITY, PieceCategory.CONTENT_AND_FILES],
   authors: [],
   actions: [generateDocumentAction, updateTemplateAction],
